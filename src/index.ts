@@ -46,6 +46,8 @@ let errorEmitted = false
 const { parse } = compiler
 const exportHelperPath = JSON.stringify(require.resolve('./exportHelper'))
 
+const vueLoader = require.resolve(__filename)
+
 export default function loader(
   this: LoaderContext<VueLoaderOptions>,
   source: string
@@ -58,13 +60,13 @@ export default function loader(
     !(loaderContext as any)['thread-loader'] &&
     !(loaderContext as any)[VueLoaderPlugin.NS]
   ) {
-    loaderContext.emitError(
-      new Error(
-        `vue-loader was used without the corresponding plugin. ` +
-          `Make sure to include VueLoaderPlugin in your webpack config.`
-      )
-    )
-    errorEmitted = true
+    // loaderContext.emitError(
+    //   new Error(
+    //     `vue-loader was used without the corresponding plugin. ` +
+    //       `Make sure to include VueLoaderPlugin in your webpack config.`
+    //   )
+    // )
+    // errorEmitted = true
   }
 
   const stringifyRequest = (r: string) => _stringifyRequest(loaderContext, r)
@@ -76,7 +78,12 @@ export default function loader(
     rootContext,
     resourcePath,
     resourceQuery: _resourceQuery = '',
+    _compiler,
   } = loaderContext
+
+  const webpackVersion = _compiler?.webpack?.version
+
+  const isWebpack5 = webpackVersion && webpackVersion[0] > '4'
 
   const rawQuery = _resourceQuery.slice(1)
   const incomingQuery = qs.parse(rawQuery)
@@ -156,7 +163,9 @@ export default function loader(
     const src = (script && !scriptSetup && script.src) || resourcePath
     const attrsQuery = attrsToQuery((scriptSetup || script)!.attrs, 'js')
     const query = `?vue&type=script${attrsQuery}${resourceQuery}`
-    const scriptRequest = stringifyRequest(src + query)
+    const scriptRequest = stringifyRequest(
+      isWebpack5 ? genMatchResource(src, query, lang || 'js') : src + query
+    )
     scriptImport =
       `import script from ${scriptRequest}\n` +
       // support named exports
@@ -176,7 +185,13 @@ export default function loader(
     const tsQuery =
       options.enableTsInTemplate !== false && isTS ? `&ts=true` : ``
     const query = `?vue&type=template${idQuery}${scopedQuery}${tsQuery}${attrsQuery}${resourceQuery}`
-    templateRequest = stringifyRequest(src + query)
+    templateRequest = stringifyRequest(
+      isWebpack5
+        ? genMatchResource(src, query, isTS ? 'ts' : 'js', [
+            require.resolve('./templateLoader'),
+          ])
+        : src + query
+    )
     templateImport = `import { ${renderFnName} } from ${templateRequest}`
     propsToAttach.push([renderFnName, renderFnName])
   }
@@ -191,12 +206,19 @@ export default function loader(
       .forEach((style, i) => {
         const src = style.src || resourcePath
         const attrsQuery = attrsToQuery(style.attrs, 'css')
+        const lang = style.lang || 'css'
         // make sure to only pass id when necessary so that we don't inject
         // duplicate tags when multiple components import the same css file
         const idQuery = !style.src || style.scoped ? `&id=${id}` : ``
         const inlineQuery = asCustomElement ? `&inline` : ``
         const query = `?vue&type=style&index=${i}${idQuery}${inlineQuery}${attrsQuery}${resourceQuery}`
-        const styleRequest = stringifyRequest(src + query)
+        const styleRequest = stringifyRequest(
+          isWebpack5
+            ? genMatchResource(src, query, lang, [
+                require.resolve('./stylePostLoader'),
+              ])
+            : src + query
+        )
         if (style.module) {
           if (asCustomElement) {
             loaderContext.emitError(
@@ -312,4 +334,14 @@ function attrsToQuery(attrs: SFCBlock['attrs'], langFallback?: string): string {
     query += `&lang=${langFallback}`
   }
   return query
+}
+
+function genMatchResource(
+  resourcePath: string,
+  resourceQuery: string,
+  lang: string,
+  additionalLoaders: string[] = []
+) {
+  const loaders = `${[...additionalLoaders, vueLoader].join('!')}`
+  return `${resourcePath}.${lang}${resourceQuery}!=!${loaders}!${resourcePath}${resourceQuery}`
 }

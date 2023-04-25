@@ -59,6 +59,16 @@ export const pitch = function () {
 
   // Inject style-post-loader before css-loader for scoped CSS and trimming
   if (query.type === `style`) {
+    // let l =
+    //   query.inline != null // 处理 inline
+    //     ? [styleInlineLoaderPath]
+    //     : [require.resolve(__dirname)]
+
+    // // inline match resource
+    // if (typeof query.lang === 'string') {
+    //   return `@import ${genRequest(l, context, query.lang)};`
+    // }
+
     const cssLoaderIndex = loaders.findIndex(isCSSLoader)
     if (cssLoaderIndex > -1) {
       // if inlined, ignore any loaders after css-loader and replace w/ inline
@@ -104,12 +114,16 @@ function genProxyModule(
 
 function genRequest(
   loaders: (Loader | string)[],
-  context: LoaderContext<VueLoaderOptions>
+  context: LoaderContext<VueLoaderOptions>,
+  matchLang: string = ''
 ) {
   const loaderStrings = loaders.map((loader) => {
     return typeof loader === 'string' ? loader : loader.request
   })
   const resource = context.resourcePath + context.resourceQuery
+  // const matchResource = matchLang
+  //   ? context.resourcePath + `.${matchLang}` + context.resourceQuery + '!=!'
+  //   : ''
   return stringifyRequest(
     context,
     '-!' + [...loaderStrings, resource].join('!')

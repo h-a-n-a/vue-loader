@@ -104,6 +104,7 @@ class VueLoaderPlugin {
   static NS = NS
 
   apply(compiler: Compiler) {
+    return
     // @ts-ignore
     const normalModule = compiler.webpack.NormalModule || NormalModule
 

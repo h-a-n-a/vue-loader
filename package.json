@@ -13,7 +13,7 @@
     "dev": "tsc --watch",
     "build": "tsc",
     "pretest": "tsc",
-    "test": "jest",
+    "test": "jest --runInBand",
     "pretest:webpack4": "tsc",
     "test:webpack4": "WEBPACK4=true jest",
     "dev-example": "node example/devServer.js --config example/webpack.config.js --inline --hot",
